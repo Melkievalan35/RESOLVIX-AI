@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat with Agent — Resolvix</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="titles">
+          <div class="eyebrow">Live Assistance</div>
+          <h1>Chat with your Resolution Agent</h1>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-shell">
+      <div class="chat-head">
+        <span class="agent-dot"></span>
+        <div>
+          <div style="font-weight:600;font-size:14.5px;">Customer Agent</div>
+          <div class="mono" style="font-size:11.5px;color:var(--paper-dim);">Routed via Orchestrator · avg reply &lt; 4s</div>
+        </div>
+      </div>
+
+      <div class="chat-body" id="chatBody"></div>
+      <div class="quick-replies" id="quickReplies"></div>
+
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Describe your issue or ask about a case…" />
+        <button class="icon-btn" id="sendBtn" aria-label="Send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/shell.js"></script>
+<script>
+  Store.requireAuth();
+  const user = Store.currentUser();
+  Shell.mount('chat');
+
+  const chatBody = document.getElementById('chatBody');
+  const quickRepliesEl = document.getElementById('quickReplies');
+  const input = document.getElementById('chatInput');
+
+  const openCase = Store.listComplaints(user.id).find(c => c.status !== 'resolved');
+
+  function addMessage(role, text) {
+    const el = document.createElement('div');
+    el.className = `msg ${role}`;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    el.innerHTML = `${text}<div class="msg-meta">${role === 'agent' ? 'Customer Agent' : 'You'} · ${time}</div>`;
+    chatBody.appendChild(el);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function showTyping() {
+    const el = document.createElement('div');
+    el.className = 'typing';
+    el.id = 'typingIndicator';
+    el.innerHTML = '<span></span><span></span><span></span>';
+    chatBody.appendChild(el);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+  function hideTyping() {
+    const el = document.getElementById('typingIndicator');
+    if (el) el.remove();
+  }
+
+  function agentReply(text, delay = 900) {
+    showTyping();
+    setTimeout(() => {
+      hideTyping();
+      addMessage('agent', text);
+    }, delay);
+  }
+
+  function setQuickReplies(options) {
+    quickRepliesEl.innerHTML = options.map(o => `<div class="quick-reply">${o}</div>`).join('');
+    quickRepliesEl.querySelectorAll('.quick-reply').forEach(el => {
+      el.addEventListener('click', () => handleUserMessage(el.textContent));
+    });
+  }
+
+  function handleUserMessage(text) {
+    if (!text.trim()) return;
+    addMessage('user', text);
+    input.value = '';
+    quickRepliesEl.innerHTML = '';
+    routeReply(text.toLowerCase());
+  }
+
+  function routeReply(text) {
+    if (text.includes('status') || text.includes('case') || text.includes('update')) {
+      if (openCase) {
+        agentReply(`Case <span class="mono">${openCase.ticketId}</span> — "${openCase.subject}" — is currently <b>${Store.STATUS_LABEL[openCase.status]}</b>. The Policy Agent matched it against your plan's refund clause and confidence is at ${(openCase.confidence * 100).toFixed(0)}%.`);
+        setQuickReplies(['Why this confidence score?', 'Escalate to a human', 'Thanks, that\'s all']);
+      } else {
+        agentReply('You have no open cases right now — everything on file is resolved. Want to file a new complaint?');
+        setQuickReplies(['File a complaint', 'No thanks']);
+      }
+    } else if (text.includes('confidence') || text.includes('why')) {
+      agentReply('Confidence reflects how closely your evidence and description matched a known policy pattern. Scores below 70% are automatically routed to a human reviewer as a safety check — nothing gets auto-closed on a low-confidence read.');
+      setQuickReplies(['Escalate to a human', 'Thanks, that\'s all']);
+    } else if (text.includes('escalate') || text.includes('human')) {
+      agentReply('Done — I\'ve flagged this for the Escalation Agent and a specialist will follow up within 2 business hours. You\'ll see the status update in your Complaint History.');
+      setQuickReplies(['Thanks, that\'s all']);
+    } else if (text.includes('file a complaint')) {
+      agentReply('Happy to help — taking you to the complaint form.');
+      setTimeout(() => window.location.href = 'complaint-form.html', 1200);
+    } else if (text.includes('refund')) {
+      agentReply('Refunds are typically processed within 3–5 business days once approved. If it\'s tied to an open case, I can check its exact stage for you.');
+      setQuickReplies(['Check my case status', 'Thanks, that\'s all']);
+    } else {
+      agentReply('Got it — I\'ve noted that. I can check an existing case, explain a decision, or help you escalate. What would help most?');
+      setQuickReplies(['Check my case status', 'Why this confidence score?', 'Escalate to a human']);
+    }
+  }
+
+  document.getElementById('sendBtn').addEventListener('click', () => handleUserMessage(input.value));
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleUserMessage(input.value); });
+
+  // opening message
+  agentReply(`Hi ${user.name.split(' ')[0]}, I'm your Customer Agent. ${openCase ? `I see an open case on "${openCase.subject}" — want an update?` : 'How can I help today?'}`, 500);
+  setTimeout(() => {
+    setQuickReplies(openCase ? ['Check my case status', 'File a complaint'] : ['File a complaint']);
+  }, 1500);
+</script>
+</body>
+</html>

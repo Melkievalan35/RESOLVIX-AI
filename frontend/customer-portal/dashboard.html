@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Resolvix</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="titles">
+          <div class="eyebrow">Overview</div>
+          <h1 id="greeting">Welcome back</h1>
+        </div>
+      </div>
+      <a href="complaint-form.html" class="btn btn-primary">+ File a Complaint</a>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 style="font-size:16px;">Recent cases</h3>
+        <a href="complaint-history.html" style="font-size:13px;color:var(--teal);font-weight:600;">View all →</a>
+      </div>
+      <div id="recentList"></div>
+    </div>
+  </main>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/shell.js"></script>
+<script>
+  Store.requireAuth();
+  const user = Store.currentUser();
+  Shell.mount('dashboard');
+  document.getElementById('greeting').textContent = `Welcome back, ${user.name.split(' ')[0]}`;
+
+  const all = Store.listComplaints(user.id);
+  const counts = { open: 0, progress: 0, resolved: 0, escalated: 0 };
+  all.forEach(c => counts[c.status]++);
+
+  const avgConfidence = all.length ? Math.round((all.reduce((s, c) => s + (c.confidence || 0), 0) / all.length) * 100) : 0;
+
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat-card">
+      <div class="label">Open Cases</div>
+      <div class="value">${counts.open + counts.progress}</div>
+      <div class="delta up">${counts.escalated} escalated</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Resolved</div>
+      <div class="value">${counts.resolved}</div>
+      <div class="delta up">Total cases: ${all.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg. Resolution Time</div>
+      <div class="value">6.4<span style="font-size:16px;color:var(--paper-dim);"> hrs</span></div>
+      <div class="delta up">Faster than 89% of cases</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Model Confidence</div>
+      <div class="value">${avgConfidence || '—'}<span style="font-size:16px;color:var(--paper-dim);">${avgConfidence ? '%' : ''}</span></div>
+      <div class="delta">Across your active cases</div>
+    </div>
+  `;
+
+  const recentList = document.getElementById('recentList');
+  const recent = all.slice(0, 4);
+
+  if (!recent.length) {
+    recentList.innerHTML = `<div class="empty-state"><h3>No cases yet</h3><p>File your first complaint and track it here.</p></div>`;
+  } else {
+    recentList.innerHTML = recent.map(c => `
+      <div class="ticket">
+        <div class="ticket-body">
+          <div class="ticket-id mono">${c.ticketId}</div>
+          <div class="ticket-subject">${c.subject}</div>
+          <div class="ticket-meta">
+            <span>${c.category}</span>
+            <span class="badge ${c.status}">${Store.STATUS_LABEL[c.status]}</span>
+            <span>${Store.timeAgo(c.createdAt)}</span>
+          </div>
+        </div>
+        <div class="ticket-stub"><div class="stamp ${c.status}">${Store.STATUS_LABEL[c.status]}</div></div>
+      </div>
+    `).join('');
+  }
+</script>
+</body>
+</html>

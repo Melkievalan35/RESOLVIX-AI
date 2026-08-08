@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Create account — Resolvix</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-brand">
+    <div>
+      <div class="brand-mark"><span class="dot"></span> RESOLVIX AI</div>
+      <h1>Open a case in under a minute. We'll take it from there.</h1>
+      <p class="lede">Eight specialised agents — from evidence review to fraud checks — work your case in parallel, not in a queue.</p>
+    </div>
+    <div class="stub-preview mono">
+      <div class="row"><span>Avg. first response</span><span>&lt; 2 min</span></div>
+      <div class="row"><span>Avg. resolution</span><span>6.4 hrs</span></div>
+      <div class="row"><span>Explainability</span><span style="color:#2FD9C4">Full reasoning</span></div>
+    </div>
+  </div>
+
+  <div class="auth-form-wrap">
+    <div class="auth-card">
+      <div class="eyebrow">Customer Portal</div>
+      <h2>Create your account</h2>
+      <p class="sub">Set up access to the claims desk — it takes a minute.</p>
+
+      <div class="form-msg error" id="formMsg"></div>
+
+      <form id="registerForm" novalidate>
+        <div class="field" id="nameField">
+          <label for="name">Full name</label>
+          <input type="text" id="name" placeholder="Aarav Sharma" autocomplete="name" />
+          <div class="field-error">Enter your full name.</div>
+        </div>
+        <div class="field" id="emailField">
+          <label for="email">Email</label>
+          <input type="email" id="email" placeholder="you@company.com" autocomplete="email" />
+          <div class="field-error">Enter a valid email address.</div>
+        </div>
+        <div class="field" id="phoneField">
+          <label for="phone">Phone number</label>
+          <input type="tel" id="phone" placeholder="+91 98765 43210" autocomplete="tel" />
+          <div class="field-error">Enter a valid phone number.</div>
+        </div>
+        <div class="field" id="passwordField">
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password" />
+          <div class="field-error">Password must be at least 8 characters.</div>
+        </div>
+        <div class="field" id="confirmField">
+          <label for="confirm">Confirm password</label>
+          <input type="password" id="confirm" placeholder="Re-enter password" autocomplete="new-password" />
+          <div class="field-error">Passwords do not match.</div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Create account</button>
+      </form>
+
+      <div class="auth-foot">Already have an account? <a href="login.html">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/store.js"></script>
+<script>
+  Store.redirectIfAuthed();
+
+  const form = document.getElementById('registerForm');
+  const msg = document.getElementById('formMsg');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function setError(fieldId, on) { document.getElementById(fieldId).classList.toggle('has-error', on); }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    msg.classList.remove('show');
+
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+
+    let valid = true;
+    const nameOk = name.length >= 2; setError('nameField', !nameOk); if (!nameOk) valid = false;
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); setError('emailField', !emailOk); if (!emailOk) valid = false;
+    const phoneOk = phone.replace(/\D/g, '').length >= 10; setError('phoneField', !phoneOk); if (!phoneOk) valid = false;
+    const passOk = password.length >= 8; setError('passwordField', !passOk); if (!passOk) valid = false;
+    const confirmOk = passOk && password === confirm; setError('confirmField', !confirmOk); if (!confirmOk) valid = false;
+    if (!valid) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating account…';
+
+    setTimeout(() => {
+      const result = Store.register({ name, email, phone, password });
+      if (!result.ok) {
+        msg.textContent = result.error;
+        msg.classList.add('show');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create account';
+        return;
+      }
+      window.location.href = 'dashboard.html';
+    }, 500);
+  });
+</script>
+</body>
+</html>

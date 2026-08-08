@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Profile — Resolvix</title>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebarMount"></aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="titles">
+          <div class="eyebrow">Account</div>
+          <h1>Profile &amp; settings</h1>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-grid">
+      <div class="panel profile-card">
+        <div class="avatar-lg" id="avatarLg"></div>
+        <h3 id="profileName" style="font-size:18px;"></h3>
+        <p style="font-size:13px;" id="memberSince"></p>
+        <div class="mono" style="font-size:12px;color:var(--paper-dim);margin-top:8px;" id="caseCount"></div>
+      </div>
+
+      <div>
+        <div class="panel" style="margin-bottom:20px;">
+          <div class="section-title">Contact details</div>
+          <div class="form-msg success" id="detailsMsg">Profile updated.</div>
+          <form id="detailsForm">
+            <div class="field">
+              <label for="name">Full name</label>
+              <input type="text" id="name" />
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input type="email" id="email" />
+            </div>
+            <div class="field">
+              <label for="phone">Phone number</label>
+              <input type="tel" id="phone" />
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+          </form>
+        </div>
+
+        <div class="panel" style="margin-bottom:20px;">
+          <div class="section-title">Notification preferences</div>
+          <div class="toggle-row">
+            <div><div class="t-label">Email updates</div><div class="t-sub">Case status changes and resolutions</div></div>
+            <label class="switch"><input type="checkbox" id="emailNotify"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="t-label">SMS alerts</div><div class="t-sub">Urgent case escalations only</div></div>
+            <label class="switch"><input type="checkbox" id="smsNotify"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="t-label">WhatsApp</div><div class="t-sub">Chat-style updates from your agent</div></div>
+            <label class="switch"><input type="checkbox" id="whatsappNotify"><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div><div class="t-label">Product updates</div><div class="t-sub">Occasional news about new features</div></div>
+            <label class="switch"><input type="checkbox" id="marketing"><span class="slider"></span></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="section-title">Change password</div>
+          <div class="form-msg error" id="pwMsg"></div>
+          <form id="pwForm">
+            <div class="field" id="currentPwField">
+              <label for="currentPw">Current password</label>
+              <input type="password" id="currentPw" />
+              <div class="field-error">Enter your current password.</div>
+            </div>
+            <div class="field" id="newPwField">
+              <label for="newPw">New password</label>
+              <input type="password" id="newPw" />
+              <div class="field-error">New password must be at least 8 characters.</div>
+            </div>
+            <button type="submit" class="btn btn-ghost btn-sm">Update password</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/store.js"></script>
+<script src="js/shell.js"></script>
+<script>
+  Store.requireAuth();
+  let user = Store.currentUser();
+  Shell.mount('profile');
+
+  function paint() {
+    document.getElementById('avatarLg').textContent = Store.initials(user.name);
+    document.getElementById('profileName').textContent = user.name;
+    document.getElementById('memberSince').textContent = `Member since ${Store.formatDate(user.createdAt)}`;
+    document.getElementById('caseCount').textContent = `${Store.listComplaints(user.id).length} total cases filed`;
+    document.getElementById('name').value = user.name;
+    document.getElementById('email').value = user.email;
+    document.getElementById('phone').value = user.phone || '';
+    document.getElementById('emailNotify').checked = !!user.prefs.emailNotify;
+    document.getElementById('smsNotify').checked = !!user.prefs.smsNotify;
+    document.getElementById('whatsappNotify').checked = !!user.prefs.whatsappNotify;
+    document.getElementById('marketing').checked = !!user.prefs.marketing;
+  }
+  paint();
+
+  document.getElementById('detailsForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    if (!name || !email) return;
+    const result = Store.updateProfile(user.id, { name, email, phone });
+    if (result.ok) {
+      user = result.user;
+      paint();
+      const msg = document.getElementById('detailsMsg');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2200);
+      Shell.mount('profile');
+    }
+  });
+
+  ['emailNotify', 'smsNotify', 'whatsappNotify', 'marketing'].forEach(key => {
+    document.getElementById(key).addEventListener('change', (e) => {
+      const prefs = { ...user.prefs, [key]: e.target.checked };
+      const result = Store.updateProfile(user.id, { prefs });
+      if (result.ok) { user = result.user; Shell.toast('Preference saved'); }
+    });
+  });
+
+  document.getElementById('pwForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const pwMsg = document.getElementById('pwMsg');
+    pwMsg.classList.remove('show');
+    const current = document.getElementById('currentPw').value;
+    const next = document.getElementById('newPw').value;
+
+    let valid = true;
+    const currentOk = current === user.password;
+    document.getElementById('currentPwField').classList.toggle('has-error', !currentOk); if (!currentOk) valid = false;
+    const nextOk = next.length >= 8;
+    document.getElementById('newPwField').classList.toggle('has-error', !nextOk); if (!nextOk) valid = false;
+    if (!valid) {
+      if (!currentOk) { pwMsg.textContent = 'Current password is incorrect.'; pwMsg.classList.add('show'); }
+      return;
+    }
+
+    const result = Store.updateProfile(user.id, { password: next });
+    if (result.ok) {
+      user = result.user;
+      document.getElementById('pwForm').reset();
+      Shell.toast('Password updated');
+    }
+  });
+</script>
+</body>
+</html>
